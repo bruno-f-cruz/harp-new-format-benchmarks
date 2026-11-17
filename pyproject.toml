@@ -1,0 +1,24 @@
+[project]
+name = "harp-new-format-benchmarks"
+version = "0.1.0"
+description = "Local vs S3 benchmarks of the packed .harp format proposed in harp-tech/protocol#251, with a Parquet comparison."
+requires-python = ">=3.11"
+dependencies = [
+    "harp-protocol",
+    "harp-data",
+    "harp-benchmarks",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=15",
+    "boto3",
+    "s3fs",
+]
+
+# The harness lives in the harp-tech/python workspace (not on PyPI).
+[tool.uv.sources]
+harp-protocol = { git = "https://github.com/harp-tech/python", subdirectory = "src/packages/harp-protocol" }
+harp-data = { git = "https://github.com/harp-tech/python", subdirectory = "src/packages/harp-data" }
+harp-benchmarks = { git = "https://github.com/harp-tech/python", subdirectory = "src/packages/harp-benchmarks" }
+
+[tool.uv]
+package = false

@@ -5,3 +5,4 @@ corpus/
 *.harp
 *.parquet
 *.log
+__marimo__/

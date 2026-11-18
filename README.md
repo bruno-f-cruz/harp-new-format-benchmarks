@@ -3,18 +3,25 @@
 Benchmarks of the packed `.harp` recording format proposed in [harp-tech/protocol#251](https://github.com/harp-tech/protocol/issues/251),
 read locally and from S3, against the current folder format and against Parquet.
 
-The data comes from the `harp.benchmarks` harness in [harp-tech/python](https://github.com/harp-tech/python) (30 register fixtures,
-15 timestamped and 15 untimestamped twins, 330,000 frames each, synthetic random payloads). The full results are in
+The data comes from the `harp.benchmarks` harness in [harp-tech/python](https://github.com/harp-tech/python) (the 15 timestamped register fixtures,
+330,000 frames each, synthetic random payloads). The full results are in
 [`report.md`](report.md), the raw results in [`results/`](results/).
 
 ## Layouts compared
 
-| Layout | What it is |
-|-|-|
-| `folder` | Current format: one `.bin` per register |
-| `stored`, `deflate1` | One `.harp` zip archive with every register, members stored or deflated (level 1) |
-| `stored_chunked`, `deflate1_chunked` | The same, with each register split into 50,000-row time chunks, one zip member per chunk |
-| `parquet snappy_rg50k`, `zstd_rg50k`, `zstd_rgall` | One Parquet file per register, decoded columns plus a `Time` column; row groups of 50k rows, or one row group |
+Each name is one way of storing the same recording:
+
+| Layout | What it is | Compression | Metadata |
+|-|-|-|-|
+| `folder` | Current format: a directory with one raw `.bin` per register (on S3, one object per register) | none | none; the reader must open the file to learn its row count and time range |
+| `stored` | One `.harp` zip archive, one member per register. "Stored" is zip's term for no compression, so members are byte-identical to the `.bin` files | none | zip comment per member |
+| `deflate1` | The same archive with members deflated at level 1 (fastest) | deflate | zip comment per member |
+| `stored_chunked` | As `stored`, but each register is split into 50,000-row time chunks, one zip member per chunk | none | zip comment per chunk, so a reader can skip chunks by time |
+| `deflate1_chunked` | Chunked and deflated | deflate | zip comment per chunk |
+| `snappy_rg50k`, `zstd_rg50k` | Not a Harp format: one Parquet file per register, decoded columns plus a `Time` column, 50,000-row row groups | snappy / zstd | row-group statistics in the footer |
+| `zstd_rgall` | Parquet, zstd, a single row group per register | zstd | footer |
+
+The `layout` operation in the benchmarks is something else: the metadata lookup (row count, frame stride, first and last timestamp) a reader does before any slice or time query.
 
 Each `.harp` member's zip comment holds `{stride, rows, tmin, tmax, monotonic}`, the archive comment holds `{"harp":1}`, as in the issue.
 

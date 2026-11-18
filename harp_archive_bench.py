@@ -322,7 +322,7 @@ def main():
     global BUCKET, ROOT_PREFIX
     BUCKET, ROOT_PREFIX = a.bucket, a.prefix.strip("/")
     a.out.mkdir(parents=True, exist_ok=True)
-    regs = [r for r in BENCHMARK_REGISTERS if not a.only or r.name in a.only]
+    regs = [r for r in BENCHMARK_REGISTERS if r.timestamped and (not a.only or r.name in a.only)]  # issue #251: every message carries a timestamp
     corpus = a.out / "corpus"
     for r in regs: ensure_corpus(r, a.entries, data_dir=corpus)
     raws = {r.name: (corpus / r.filename).read_bytes() for r in regs}

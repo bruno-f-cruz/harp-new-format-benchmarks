@@ -2,7 +2,7 @@
 
 Every use case is measured cold: opening the recording is part of the cost.
 
-  uc1_window_all    all events between two times, from every register (untimestamped registers cannot take part)
+  uc1_window_all    all events between two times, from every register
   uc1_window_empty  the same query for a window after the end of the recording
   uc2_full5         load 5 whole registers (DigitalInputs, AnalogData, Counter0, PulseDO0, StartPulse) into DataFrames
   uc3_bounds_meta   earliest and latest timestamp in the recording, leaning on metadata where the format has it
@@ -212,7 +212,7 @@ def main():
     a = ap.parse_args()
     hab.BUCKET = a.bucket
     a.out.mkdir(parents=True, exist_ok=True)
-    regs = list(BENCHMARK_REGISTERS)
+    regs = [r for r in BENCHMARK_REGISTERS if r.timestamped]
     five = [r for r in regs if r.name in FIVE]
     truth = load_truth(a.corpus, regs)
     c_window, c_full5, c_bounds = make_checks(truth, regs)

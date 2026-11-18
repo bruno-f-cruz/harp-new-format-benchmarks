@@ -113,12 +113,13 @@ def main():
     ap.add_argument("--prefix", required=True)
     ap.add_argument("--region", default="us-west-2")
     ap.add_argument("--only", nargs="+")
+    ap.add_argument("--stage", nargs="+", help="re-measure only these kind/variant stages (e.g. s3_native/snappy_rg50k) and merge them into the existing parquet_results.json; conversion and upload are skipped")
     ap.add_argument("--local-runs", type=int, default=5)
     ap.add_argument("--remote-runs", type=int, default=3)
     a = ap.parse_args()
     hab.BUCKET = a.bucket
     a.out.mkdir(parents=True, exist_ok=True)
-    regs = [r for r in BENCHMARK_REGISTERS if not a.only or r.name in a.only]
+    regs = [r for r in BENCHMARK_REGISTERS if r.timestamped and (not a.only or r.name in a.only)]
     for r in regs: ensure_corpus(r, a.entries, data_dir=a.corpus)
 
     # ---- convert
@@ -143,7 +144,7 @@ def main():
     # ---- upload
     s3 = boto3.client("s3", region_name=a.region, config=Config(max_pool_connections=16, retries={"max_attempts": 3}))
     pfx = f"{a.prefix.strip('/')}/{a.run_id}"
-    for v in VARIANTS:
+    for v in ([] if a.stage else VARIANTS):
         t, rc, err = hab.sh(["aws", "s3", "cp", str(a.out / "parquet" / v), f"s3://{a.bucket}/{pfx}/parquet/{v}/",
                              "--recursive", "--only-show-errors"])
         info[v].update(upload_s=t, upload_rc=rc, upload_err=err, upload_objects=len(regs)); print("upload", v, t, rc, err, flush=True)
@@ -163,6 +164,7 @@ def main():
     s3.head_object(Bucket=a.bucket, Key=f"{pfx}/parquet/{next(iter(VARIANTS))}/{regs[0].name}_{regs[0].address}.parquet")
     for kind in KINDS:
         for v in VARIANTS:
+            if a.stage and f"{kind}/{v}" not in a.stage: continue
             t_open, req_open = [], 0
             t0_all = time.perf_counter()
             for r in regs:
@@ -191,7 +193,15 @@ def main():
                                     requests=req, bytes=byt, ok=ok, err=err))
             print(f"measured {kind}/{v} in {time.perf_counter() - t0_all:.0f}s", flush=True)
 
-    (a.out / "parquet_results.json").write_text(json.dumps(
+    res_path = a.out / "parquet_results.json"
+    if a.stage:
+        old = json.loads(res_path.read_text())
+        redo = {tuple(x.split("/")) for x in a.stage}
+        old["log"] = [r for r in old["log"] if (r["loc"], r["layout"]) not in redo] + log
+        old["opens"].update(opens)
+        old["remeasured"] = sorted(set(old.get("remeasured", [])) | set(a.stage))
+        res_path.write_text(json.dumps(old, indent=1, default=str)); print("merged", a.stage, flush=True); return
+    res_path.write_text(json.dumps(
         dict(info=info, opens=opens, log=log, decode_ms=decode_ms, raw_bytes=raw_total, entries=a.entries,
              prefix=f"s3://{a.bucket}/{pfx}/parquet/"), indent=1, default=str))
     print("done", flush=True)

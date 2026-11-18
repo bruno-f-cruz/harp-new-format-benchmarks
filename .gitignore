@@ -4,3 +4,4 @@ out/
 corpus/
 *.harp
 *.parquet
+*.log
